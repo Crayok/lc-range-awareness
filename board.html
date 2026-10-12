@@ -1,0 +1,658 @@
+<!doctype html><html><head><title>Range Status Board</title><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: a range-control console. One card per site across the top; range-wide items, the exercise and the log below.
+   Colour is reserved for site danger status. Readiness and site state are words in neutral ink. */
+:root {
+  --bg: #EEF1EF; --panel: #FBFCFB; --ink: #14201C; --muted: #5B6965; --line: #CDD6D2; --line-strong: #8E9B96;
+  --accent: #0E5A73; --accent-ink: #FFFFFF; --wash: #E2E9E6;
+  --pad-green: #1F8F50; --pad-yellow: #D99A00; --pad-red: #C5322B;
+  --pad-green-wash: #DDF0E4; --pad-yellow-wash: #FBEFC9; --pad-red-wash: #F8DEDB;
+  --display: "Barlow Condensed", "Arial Narrow", "Helvetica Neue", Arial, sans-serif;
+  --body: "IBM Plex Sans", -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0E1412; --panel: #161F1C; --ink: #E7EEEB; --muted: #9BAAA5; --line: #2A3632; --line-strong: #5C6B66;
+  --accent: #63B7D6; --accent-ink: #06202A; --wash: #1E2925;
+  --pad-green: #43C27B; --pad-yellow: #F1B82A; --pad-red: #F0655E;
+  --pad-green-wash: #15301F; --pad-yellow-wash: #3A2E0C; --pad-red-wash: #3D1A18;
+  color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #0E1412; --panel: #161F1C; --ink: #E7EEEB; --muted: #9BAAA5; --line: #2A3632; --line-strong: #5C6B66;
+  --accent: #63B7D6; --accent-ink: #06202A; --wash: #1E2925;
+  --pad-green: #43C27B; --pad-yellow: #F1B82A; --pad-red: #F0655E;
+  --pad-green-wash: #15301F; --pad-yellow-wash: #3A2E0C; --pad-red-wash: #3D1A18;
+  color-scheme: dark }
+
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 14px; line-height: 1.45; }
+.wrap { max-width: 1320px; margin: 0 auto; padding-inline: 16px; padding-block: 16px 40px; display: flex; flex-direction: column; gap: 16px; }
+button, select, input { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.top { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: flex-end; justify-content: space-between; }
+.top h1 { font-family: var(--display); font-weight: 700; font-size: 30px; line-height: 1; margin: 0; letter-spacing: 0.01em; text-transform: uppercase; }
+.top .sub { color: var(--muted); font-size: 13px; margin-top: 4px; }
+.top-right { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.field { display: flex; flex-direction: column; gap: 2px; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.field select { text-transform: none; letter-spacing: 0; font-size: 14px; color: var(--ink); background: var(--panel); border: 1px solid var(--line-strong); border-radius: 4px; padding: 6px 8px; }
+.sync { font-family: var(--mono); font-size: 12px; color: var(--muted); border: 1px solid var(--line); border-radius: 4px; padding: 6px 8px; background: var(--panel); }
+
+.sites { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; align-items: start; }
+@media (max-width: 1080px) { .sites { grid-template-columns: minmax(0, 1fr); } }
+.grid { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+.col { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+@media (max-width: 860px) { .grid { grid-template-columns: minmax(0, 1fr); } }
+
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.panel > h2 { font-family: var(--display); font-weight: 600; font-size: 15px; letter-spacing: 0.08em; text-transform: uppercase; margin: 0; color: var(--muted); display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.panel > h2 small { font-family: var(--body); font-weight: 400; font-size: 12px; letter-spacing: 0; text-transform: none; text-align: right; }
+
+/* Site card */
+.site { padding: 0; gap: 0; overflow: hidden; }
+.band { padding: 12px 16px; border-bottom: 2px solid var(--line-strong); display: flex; flex-direction: column; gap: 8px; }
+.band[data-c="GREEN"] { background: var(--pad-green-wash); border-bottom-color: var(--pad-green); }
+.band[data-c="YELLOW"] { background: var(--pad-yellow-wash); border-bottom-color: var(--pad-yellow); }
+.band[data-c="RED"] { background: var(--pad-red-wash); border-bottom-color: var(--pad-red); }
+.band-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.site-name { font-family: var(--display); font-weight: 700; font-size: 22px; letter-spacing: 0.04em; text-transform: uppercase; line-height: 1; }
+.site-colour { font-family: var(--display); font-weight: 700; font-size: 30px; line-height: 1; letter-spacing: 0.02em; }
+.pad-mean { font-size: 12px; color: var(--muted); min-height: 2.9em; }
+.lamps { display: flex; gap: 6px; }
+.lamp { flex: 1; border: 1px solid var(--line-strong); background: var(--panel); border-radius: 4px; padding: 6px 4px; font-family: var(--mono); font-size: 12px; font-weight: 500; color: var(--muted); }
+.lamp[aria-pressed="true"][data-c="GREEN"] { background: var(--pad-green); border-color: var(--pad-green); color: #fff; }
+.lamp[aria-pressed="true"][data-c="YELLOW"] { background: var(--pad-yellow); border-color: var(--pad-yellow); color: #201800; }
+.lamp[aria-pressed="true"][data-c="RED"] { background: var(--pad-red); border-color: var(--pad-red); color: #fff; }
+.check { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.check input { width: 16px; height: 16px; accent-color: var(--accent); }
+.count { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; }
+.count label { display: flex; align-items: center; gap: 6px; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.count input { width: 62px; font-family: var(--mono); font-size: 14px; color: var(--ink); background: var(--panel); border: 1px solid var(--line-strong); border-radius: 4px; padding: 5px 6px; }
+.count-word { font-family: var(--mono); font-size: 12px; }
+.count-word[data-ok="false"] { font-weight: 500; border: 1px solid var(--ink); border-radius: 3px; padding: 2px 6px; background: var(--panel); }
+.refused { font-size: 12.5px; border: 1px solid var(--ink); border-radius: 4px; padding: 6px 8px; background: var(--panel); }
+.body { padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 12px; }
+
+/* Site state: words, not colour */
+.state { display: flex; flex-direction: column; gap: 8px; }
+.state-word { font-family: var(--display); font-weight: 700; font-size: 44px; line-height: 0.95; letter-spacing: 0.02em; padding: 8px 14px 10px; border-radius: 4px; border: 3px solid var(--ink); text-align: center; }
+.state-word[data-s="GO"] { background: var(--ink); color: var(--panel); }
+.state-word[data-s="HOLD"] { background: repeating-linear-gradient(135deg, transparent 0 9px, var(--wash) 9px 18px); }
+.state-word[data-s="NO-GO"] { border-style: double; border-width: 7px; padding: 4px 10px 6px; }
+.state-word[data-s="OPEN"] { border-width: 1px; border-color: var(--line-strong); color: var(--muted); padding: 10px 16px 12px; }
+.state-word[data-s="SAFING"] { border-style: dashed; }
+.reasons { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 3px; font-size: 13px; }
+.reasons li::before { content: "·  "; color: var(--muted); }
+.since { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.since b { color: var(--ink); font-weight: 500; }
+.row { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; }
+.label { font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); min-width: 76px; }
+table.ready .seg { vertical-align: middle; }
+.hint { font-size: 12px; color: var(--muted); }
+
+.seg { display: inline-flex; border: 1px solid var(--line-strong); border-radius: 4px; overflow: hidden; background: var(--panel); }
+.seg button { white-space: nowrap; border: 0; border-right: 1px solid var(--line-strong); background: transparent; padding: 6px 9px; font-family: var(--mono); font-size: 12px; font-weight: 500; min-width: 44px; color: var(--muted); }
+.seg button:last-child { border-right: 0; }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--panel); }
+.seg button:disabled { cursor: default; }
+.seg.poll button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+
+.teams { display: flex; flex-direction: column; border-top: 1px solid var(--line); }
+.team { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 6px 8px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.team .seg, .team .note { grid-column: 1 / -1; }
+.team .seg { justify-self: start; }
+.padno { font-family: var(--mono); font-size: 12px; font-weight: 500; border: 1px solid var(--line-strong); border-radius: 3px; padding: 2px 6px; white-space: nowrap; }
+.teamnum { color: var(--muted); font-weight: 400; white-space: nowrap; }
+.group { display: flex; flex-direction: column; gap: 8px; border-top: 1px solid var(--line); padding-top: 10px; }
+.group-label { font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.group-label b { color: var(--ink); font-weight: 600; }
+.pollline { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.addrow input.num { flex: 0 1 92px; min-width: 76px; }
+.padpick { display: flex; align-items: center; gap: 6px; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); white-space: nowrap; }
+.padpick input { width: 54px; font-family: var(--mono); font-size: 14px; color: var(--ink); background: var(--panel); border: 1px solid var(--line-strong); border-radius: 4px; padding: 5px 6px; text-transform: none; letter-spacing: 0; }
+.item-name { font-weight: 600; }
+.owner { font-size: 12px; color: var(--muted); }
+.note { width: 100%; min-width: 90px; background: transparent; border: 0; border-bottom: 1px dashed var(--line-strong); padding: 4px 0; font-size: 13px; }
+.note::placeholder { color: var(--muted); opacity: 0.8; }
+.advice { font-size: 12.5px; border-left: 3px solid var(--ink); padding: 2px 0 2px 10px; }
+
+table.ready { width: 100%; border-collapse: collapse; }
+table.ready th { text-align: left; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); font-weight: 500; padding: 0 8px 6px 0; }
+table.ready td { border-top: 1px solid var(--line); padding: 8px 8px 8px 0; vertical-align: middle; }
+table.ready td:last-child, table.ready th:last-child { padding-right: 0; }
+.scroll-x { overflow-x: auto; }
+.ghost { background: transparent; border: 1px solid var(--line-strong); border-radius: 4px; padding: 6px 10px; font-size: 13px; }
+.ghost:hover { background: var(--wash); }
+.solid { background: var(--accent); color: var(--accent-ink); border: 1px solid var(--accent); border-radius: 4px; padding: 7px 12px; font-size: 13px; font-weight: 600; }
+.solid:disabled, .ghost:disabled { opacity: 0.45; cursor: default; }
+.x { background: transparent; border: 0; color: var(--muted); font-size: 16px; line-height: 1; padding: 2px 6px; }
+.addrow { display: flex; gap: 8px; flex-wrap: wrap; }
+.addrow input[type="text"] { flex: 1; min-width: 120px; background: var(--panel); border: 1px solid var(--line-strong); border-radius: 4px; padding: 6px 8px; }
+.addrow select { background: var(--panel); border: 1px solid var(--line-strong); border-radius: 4px; padding: 6px 8px; }
+
+.checks { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
+.checks li { border-left: 3px solid var(--ink); padding: 2px 0 2px 10px; }
+.empty { color: var(--muted); font-size: 13px; }
+
+.scn select { width: 100%; background: var(--panel); border: 1px solid var(--line-strong); border-radius: 4px; padding: 7px 8px; }
+.scn-setup { font-size: 13px; }
+.scn-start { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.injects { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 8px; counter-reset: inj; }
+.injects li { border: 1px solid var(--line); border-radius: 4px; padding: 8px 10px; background: var(--wash); counter-increment: inj; }
+.injects li.now { border-color: var(--accent); border-width: 2px; }
+.injects .inj-n { font-family: var(--mono); font-size: 11px; color: var(--muted); letter-spacing: 0.06em; }
+.injects .inj-n::after { content: counter(inj); }
+.expect { margin-top: 6px; padding-top: 6px; border-top: 1px dashed var(--line-strong); font-size: 12.5px; color: var(--muted); }
+.expect b { color: var(--ink); font-weight: 600; }
+.probes { margin: 0; padding-left: 18px; font-size: 13px; display: flex; flex-direction: column; gap: 4px; }
+
+.alerts { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; }
+.alerts li { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 8px; align-items: start; border: 1px solid var(--line); border-radius: 4px; padding: 6px 8px; font-size: 13px; }
+.alerts li[data-sev="CRITICAL"] { border: 2px solid var(--ink); }
+.sev { font-family: var(--mono); font-size: 11px; padding: 2px 5px; border: 1px solid var(--line-strong); border-radius: 3px; }
+li[data-sev="CRITICAL"] .sev { background: var(--ink); color: var(--panel); border-color: var(--ink); }
+.alerts .meta { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+
+.log { margin: 0; padding: 0; list-style: none; max-height: 420px; overflow-y: auto; display: flex; flex-direction: column; font-size: 13px; }
+.log li { display: grid; grid-template-columns: 62px 104px minmax(0, 1fr); gap: 8px; padding: 5px 0; border-top: 1px solid var(--line); }
+.log li:first-child { border-top: 0; }
+.log .t { font-family: var(--mono); font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.log .who { font-size: 12px; color: var(--muted); }
+.log li[data-k="inject"] .txt { font-weight: 600; }
+.log li[data-k="state"] .txt { font-family: var(--mono); font-size: 12px; }
+@media (max-width: 520px) { .log li { grid-template-columns: 58px minmax(0, 1fr); } .log .who { grid-column: 2; } .log .txt { grid-column: 2; } }
+.confirm { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 13px; border: 1px solid var(--line-strong); border-radius: 4px; padding: 8px 10px; background: var(--wash); }
+.foot { color: var(--muted); font-size: 12px; }
+@media (prefers-reduced-motion: no-preference) { .state-word, .band { transition: background-color 120ms, border-color 120ms; } }
+</style>
+
+<div class="wrap">
+  <div class="top">
+    <div>
+      <h1>Range Status Board</h1>
+      <div class="sub">Tabletop exercise tool for Launch Canada range roles. Not for use on a live range. <a href="index.html" style="color:var(--accent)">Back to the framework</a></div>
+    </div>
+    <div class="top-right">
+      <label class="field" for="role">Acting as
+        <select id="role"></select>
+      </label>
+      <div class="sync" id="sync" role="status">This device only</div>
+    </div>
+  </div>
+
+  <div class="sites" id="sec-sites"></div>
+
+  <div class="grid">
+    <div class="col">
+      <section class="panel" id="sec-range" aria-label="Range-wide readiness"></section>
+      <section class="panel" id="sec-checks" aria-label="Consistency checks"></section>
+      <section class="panel" id="sec-alerts" aria-label="Alerts"></section>
+    </div>
+    <div class="col">
+      <section class="panel scn" id="sec-scn" aria-label="Exercise"></section>
+      <section class="panel" id="sec-log" aria-label="Event log"></section>
+    </div>
+  </div>
+  <div class="foot">Site colour is site status from a danger point of view. Readiness and site state are shown as words on purpose, so the two are never confused. A site whose people count does not match cannot go past HOLD.</div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  var SCENARIOS = [{"id": "P1", "area": "Restricted site", "title": "The count does not match", "setup": "Salvo 2 at the Restricted site. Igniters are going in and the install crews are walking back.", "start": {"sites": {"restricted": {"colour": "RED", "phase": "ARM", "road": "GO", "lco": "HOLD", "rso": "HOLD", "cin": 6, "cout": 4}, "advanced": {"colour": "GREEN", "phase": "PREP", "road": "HOLD", "lco": "HOLD", "rso": "HOLD", "cin": 0, "cout": 0}, "statics": {"colour": "GREEN", "phase": "PREP", "road": "HOLD", "lco": "HOLD", "rso": "HOLD", "cin": 0, "cout": 0}}, "items": {"recovery": "GO", "weather": "GO", "airspace": "GO"}, "teams": [["", "4", "restricted", "GO"], ["", "9", "restricted", "GO"], ["", "12", "restricted", "GO"]]}, "injects": [["Pad Manager: \"Restricted LCO, Pad Restricted, pad clear, six in, five out.\"", "The LCO does not accept pad clear. The board reads six in, five out, the site cannot go past HOLD, and the reason is logged."], ["A team lead says the sixth person walked back early with a toolbox and is in the assembly tent.", "Someone confirms the person by sight and the check-in record is corrected. A verbal assurance alone does not clear the count."], ["The RCO asks whether the poll can start now to save time.", "The poll waits. The site cannot go past HOLD until the count matches, and then the RCO opens the poll."]], "probes": ["Who physically confirms where the sixth person is, and how is that reported?", "Where is the check-in record, and who is allowed to correct it?"], "site": "restricted"}, {"id": "P2", "area": "Restricted site", "title": "Misfire, then smoke", "setup": "Salvo 2 at the Restricted site. The first flight is away and Team 9 on pad 2 is next.", "start": {"sites": {"restricted": {"colour": "RED", "phase": "LAUNCH", "road": "GO", "lco": "GO", "rso": "GO", "cin": 6, "cout": 6}, "advanced": {"colour": "GREEN", "phase": "PREP", "road": "HOLD", "lco": "HOLD", "rso": "HOLD", "cin": 0, "cout": 0}, "statics": {"colour": "GREEN", "phase": "PREP", "road": "HOLD", "lco": "HOLD", "rso": "HOLD", "cin": 0, "cout": 0}}, "items": {"recovery": "GO", "weather": "GO", "airspace": "GO"}, "teams": [["", "4", "restricted", "FLOWN"], ["", "9", "restricted", "GO"], ["", "12", "restricted", "GO"], ["", "15", "restricted", "GO"]]}, "injects": [["Five count for pad 2. The LCO fires. Nothing happens.", "The LCO checks the right pad was selected and chooses press, recycle or hold. The event is logged."], ["Thirty seconds later a thin line of smoke rises from pad 2.", "HOLD. The site stays closed and the Restricted RSO takes direction. An alert names pad 2. The response team is readied but does not move until the Chief RSO says so."], ["Team 9's lead asks to go out and pull the igniter.", "Refused. Nobody approaches during the salvo, and afterwards only with the Restricted RSO's approval."], ["The smoke stops after two minutes. Teams 12 and 15 ask to carry on.", "The Restricted RSO decides. If the hold has passed five minutes, the poll is run again before any count."]], "probes": ["How long is the wait before anyone approaches a misfired rocket? The procedure has no number.", "Who decides whether pads 3 and 4 can fly next to a suspect rocket on pad 2?"], "site": "restricted"}, {"id": "P3", "area": "Restricted site", "title": "Telemetry drops before the count", "setup": "Salvo 2 at the Restricted site. Team 4 has flown and Team 9 is next.", "start": {"sites": {"restricted": {"colour": "RED", "phase": "LAUNCH", "road": "GO", "lco": "GO", "rso": "GO", "cin": 6, "cout": 6}, "advanced": {"colour": "GREEN", "phase": "PREP", "road": "HOLD", "lco": "HOLD", "rso": "HOLD", "cin": 0, "cout": 0}, "statics": {"colour": "GREEN", "phase": "PREP", "road": "HOLD", "lco": "HOLD", "rso": "HOLD", "cin": 0, "cout": 0}}, "items": {"recovery": "GO", "weather": "GO", "airspace": "GO"}, "teams": [["", "4", "restricted", "FLOWN"], ["", "9", "restricted", "GO"], ["", "12", "restricted", "GO"]]}, "injects": [["The LCO asks Team 9 for its GO. The team lead answers: \"HOLD, we have lost telemetry.\"", "Team 9 goes to HOLD on the display. The LCO does not count Team 9. The site is not held, because Team 12 is GO."], ["The LCO asks how long. The team says two or three minutes.", "The LCO decides on that estimate: wait for Team 9, or move on to Team 12."], ["The LCO moves on and Team 12 flies. Team 9 still has no telemetry.", "Team 9 stays at HOLD on its pad. It can fly later in the salvo if it reports GO, or it declares NO-GO and waits for close-out."], ["Team 9 asks to send one person to the pad to power-cycle the rocket.", "Refused while the site is RED. The rocket is made safe at close-out."]], "probes": ["How long an estimate is short enough to wait for?", "When a skipped team reports GO again, does anyone re-check it before the count?"], "site": "restricted"}, {"id": "A1", "area": "Advanced site", "title": "The fill time arrives and the road is not clear", "setup": "Advanced salvo. The pad is clear, the team is GO and the agreed fill time is five minutes away.", "start": {"sites": {"restricted": {"colour": "GREEN", "phase": "PREP", "road": "HOLD", "lco": "HOLD", "rso": "HOLD", "cin": 0, "cout": 0}, "advanced": {"colour": "YELLOW", "phase": "ARM", "road": "HOLD", "lco": "GO", "rso": "GO", "cin": 4, "cout": 4}, "statics": {"colour": "GREEN", "phase": "PREP", "road": "HOLD", "lco": "HOLD", "rso": "HOLD", "cin": 0, "cout": 0}}, "items": {"recovery": "GO", "weather": "GO", "airspace": "GO"}, "teams": [["", "7", "advanced", "GO"]]}, "injects": [["Road Control: the sweep found a pickup parked inside the closure. The owner is being found.", "Advanced Road stays at HOLD with the reason noted. The poll cannot complete."], ["The fill time arrives. The team lead asks the LCO to request RED.", "Refused. The Advanced RSO does not approve RED while Road is at HOLD, because the fill is time sensitive. The RCO sets a new fill time with the team."], ["The team says it would rather not wait more than twenty minutes.", "The RCO weighs the team's limit. Nothing is filled to save time."], ["Twelve minutes late, Road Control reports GO.", "The RCO completes the poll. At the new fill time the LCO requests RED, the Advanced RSO approves, and the RCO is informed."]], "probes": ["Who tells Recovery, Road and the PA audience that the fill time has moved?", "What happens if the new fill time is later than the team can accept?"], "site": "advanced"}, {"id": "A2", "area": "Advanced site", "title": "Link lost during fill", "setup": "Advanced salvo. Fill started six minutes ago and nobody is at the pad.", "start": {"sites": {"restricted": {"colour": "GREEN", "phase": "PREP", "road": "HOLD", "lco": "HOLD", "rso": "HOLD", "cin": 0, "cout": 0}, "advanced": {"colour": "RED", "phase": "LAUNCH", "road": "GO", "lco": "GO", "rso": "GO", "cin": 4, "cout": 4}, "statics": {"colour": "GREEN", "phase": "PREP", "road": "HOLD", "lco": "HOLD", "rso": "HOLD", "cin": 0, "cout": 0}}, "items": {"recovery": "GO", "weather": "GO", "airspace": "GO"}, "teams": [["", "7", "advanced", "GO"]]}, "injects": [["Team lead: \"We have lost the link to our fill controller.\"", "HOLD, then abort. The team goes to NO-GO and a critical alert is raised. The detank clock starts."], ["The team believes the vehicle is venting by itself but cannot confirm it.", "The pad stays RED. Nobody approaches on belief alone."], ["A team member offers to walk out and read the tank gauge.", "Refused until the Advanced RSO approves an approach."], ["Twenty minutes later the link returns and the tank reads zero.", "The team calls \"depressurized\". The Advanced RSO may now approve an approach and the colour steps back."]], "probes": ["Without telemetry, what counts as proof that the vehicle is depressurized?", "Who approaches first, from where, and with what protection?"], "site": "advanced"}, {"id": "A3", "area": "Advanced site", "title": "An aircraft while the vehicle is full", "setup": "Advanced salvo. Fill completed two minutes ago. The team stated a ten-minute hold limit.", "start": {"sites": {"restricted": {"colour": "GREEN", "phase": "PREP", "road": "HOLD", "lco": "HOLD", "rso": "HOLD", "cin": 0, "cout": 0}, "advanced": {"colour": "RED", "phase": "LAUNCH", "road": "GO", "lco": "GO", "rso": "GO", "cin": 4, "cout": 4}, "statics": {"colour": "GREEN", "phase": "PREP", "road": "HOLD", "lco": "HOLD", "rso": "HOLD", "cin": 0, "cout": 0}}, "items": {"recovery": "GO", "weather": "GO", "airspace": "GO"}, "teams": [["", "7", "advanced", "GO"]]}, "injects": [["The Chief RSO sees a light aircraft heading toward the restricted airspace.", "The Chief RSO sets Airspace to HOLD, and every site that needs airspace holds. The team puts the vehicle in its hold state."], ["Five minutes on, the aircraft is still circling.", "Someone is watching the hold clock and calls the time remaining."], ["At nine minutes the aircraft leaves. The team says it is still GO.", "The hold passed five minutes, so the procedure calls for the poll again before any count. The group decides whether that fits inside the limit."], ["The LCO asks for clear to count.", "Clear to count only with every polled position GO and no HOLD from the RCO or the Chief RSO. Otherwise the team aborts and vents."]], "probes": ["Who owns the hold clock, the team or the range?", "Does the five-minute re-poll rule work for a filled vehicle with a ten-minute limit?"], "site": "advanced"}, {"id": "S1", "area": "Statics", "title": "Static test with the road on hold", "setup": "A team is ready for a hot fire at the static test site. The stand is clear and the agreed fill time has arrived.", "start": {"sites": {"restricted": {"colour": "GREEN", "phase": "PREP", "road": "HOLD", "lco": "HOLD", "rso": "HOLD", "cin": 0, "cout": 0}, "advanced": {"colour": "GREEN", "phase": "PREP", "road": "HOLD", "lco": "HOLD", "rso": "HOLD", "cin": 0, "cout": 0}, "statics": {"colour": "YELLOW", "phase": "ARM", "road": "HOLD", "lco": "GO", "rso": "GO", "cin": 4, "cout": 4}}, "items": {"recovery": "GO", "weather": "GO", "airspace": "GO"}, "teams": [["", "5", "statics", "GO"]]}, "injects": [["The Statics LCO requests RED to begin filling. Road is at HOLD while a Road Monitor is relieved.", "Allowed, if the Statics RSO approves. Statics follows the restricted rule and may go RED with Road at HOLD. The test GO still needs Road at GO."], ["Fill is complete. Road is still at HOLD.", "The site holds. The team states how long it can hold when full."], ["The restricted site reports pad clear and its LCO asks for the poll.", "The RCO decides which site goes first. The procedures do not say whether two sites can be in a final count together."], ["Road reports GO for Statics.", "The RCO polls for the static test first, then for the restricted salvo."]], "probes": ["May a static test and a launch be in their final count at the same time?", "Who sets the order between sites, the RCO or the site LCOs?"], "site": "statics"}, {"id": "S2", "area": "Statics", "title": "The engine does not light", "setup": "Static test site. The vehicle is filled, the stand is clear and the RCO has given clear to count.", "start": {"sites": {"restricted": {"colour": "GREEN", "phase": "PREP", "road": "HOLD", "lco": "HOLD", "rso": "HOLD", "cin": 0, "cout": 0}, "advanced": {"colour": "GREEN", "phase": "PREP", "road": "HOLD", "lco": "HOLD", "rso": "HOLD", "cin": 0, "cout": 0}, "statics": {"colour": "RED", "phase": "LAUNCH", "road": "GO", "lco": "GO", "rso": "GO", "cin": 4, "cout": 4}}, "items": {"recovery": "GO", "weather": "GO", "airspace": "GO"}, "teams": [["", "5", "statics", "GO"]]}, "injects": [["Five count. The team commands ignition. Nothing lights and the tank is still full.", "HOLD. The team reports what its telemetry shows. Nobody approaches the stand."], ["The team wants to try again at once.", "The Statics LCO decides with the Statics RSO: one more attempt inside the fill-to-fire clock, or abort."], ["The second attempt also fails. The team's hold limit has been reached.", "Abort. The team vents and detanks, and the site moves to SAFING."], ["The team reports the tank at zero and asks to approach the stand.", "The Statics RSO approves the approach. The colour steps back to GREEN and the site returns to OPEN."]], "probes": ["How many ignition attempts are allowed on one fill?", "What must be true at the static site before SAFING ends and the site reads OPEN?"], "site": "statics"}, {"id": "S3", "area": "Statics", "title": "Fire after a static test", "setup": "Static test site. The burn ended normally thirty seconds ago and the site is winding down. A restricted salvo is arming at the same time.", "start": {"sites": {"restricted": {"colour": "YELLOW", "phase": "ARM", "road": "GO", "lco": "HOLD", "rso": "HOLD", "cin": 6, "cout": 0}, "advanced": {"colour": "GREEN", "phase": "PREP", "road": "HOLD", "lco": "HOLD", "rso": "HOLD", "cin": 0, "cout": 0}, "statics": {"colour": "RED", "phase": "POST", "road": "GO", "lco": "HOLD", "rso": "HOLD", "cin": 4, "cout": 4}}, "items": {"recovery": "GO", "weather": "GO", "airspace": "GO"}, "teams": [["", "5", "statics", "FLOWN"], ["", "4", "restricted", "HOLD"], ["", "9", "restricted", "HOLD"]]}, "injects": [["Grass near the test stand is burning.", "A critical alert is raised. The Chief RSO directs the fire team. Statics stays RED."], ["The team's telemetry shows oxidizer still in the tank.", "The fire team does not approach the stand until the team has vented and the Statics RSO says it is safe to approach."], ["Restricted teams are at their pads arming electronics.", "The RCO and the Chief RSO decide whether the Restricted site stops work. Either can set HOLD or NO-GO on that one site. On the board a critical alert puts every site that is in an event at NO-GO."], ["The fire is out and the tank reads zero.", "The Chief RSO declares the area safe and the alert is resolved. SAFING completes and Statics returns to GREEN and OPEN."]], "probes": ["Does a critical alert at one site stop the others?", "Where does the fire team stage during a static test?"], "site": "statics"}, {"id": "R1", "area": "Road and spectator", "title": "A vehicle goes around the barrier", "setup": "Salvo 2 at the Restricted site. Team 4 has flown and the LCO is about to count Team 9.", "start": {"sites": {"restricted": {"colour": "RED", "phase": "LAUNCH", "road": "GO", "lco": "GO", "rso": "GO", "cin": 6, "cout": 6}, "advanced": {"colour": "GREEN", "phase": "PREP", "road": "HOLD", "lco": "HOLD", "rso": "HOLD", "cin": 0, "cout": 0}, "statics": {"colour": "GREEN", "phase": "PREP", "road": "HOLD", "lco": "HOLD", "rso": "HOLD", "cin": 0, "cout": 0}}, "items": {"recovery": "GO", "weather": "GO", "airspace": "GO"}, "teams": [["", "4", "restricted", "FLOWN"], ["", "9", "restricted", "GO"], ["", "12", "restricted", "GO"]]}, "injects": [["A Road Monitor at the north closure radios Road Control: an ATV has gone around the barrier toward the launch area.", "Road Control calls \"HOLD, HOLD, HOLD\" on the range loop and sets Road to HOLD."], ["The LCO is at \"three\" in the five count.", "The LCO stops the count and safes the controller. The time from the Road Monitor's call to the stop is noted."], ["The ATV stops 200 m inside. The driver works for the landowner.", "Launches stay suspended. The area is cleared and swept again."], ["The Road Monitor escorts the ATV out. Six minutes have passed.", "Road reports GO. The hold passed five minutes, so the poll is run again."]], "probes": ["How many relays are there between the Road Monitor and the LCO, and how long do they take?", "May a Road Monitor call HOLD directly on the range loop?"], "site": "restricted"}, {"id": "R2", "area": "Road and spectator", "title": "Road Monitors not in position", "setup": "Salvo 3 is loaded at the Restricted site. YELLOW has just been approved and Road Control is standing up the closure.", "start": {"sites": {"restricted": {"colour": "YELLOW", "phase": "ARM", "road": "HOLD", "lco": "HOLD", "rso": "HOLD", "cin": 8, "cout": 4}, "advanced": {"colour": "GREEN", "phase": "PREP", "road": "HOLD", "lco": "HOLD", "rso": "HOLD", "cin": 0, "cout": 0}, "statics": {"colour": "GREEN", "phase": "PREP", "road": "HOLD", "lco": "HOLD", "rso": "HOLD", "cin": 0, "cout": 0}}, "items": {"recovery": "GO", "weather": "GO", "airspace": "GO"}, "teams": [["", "4", "restricted", "HOLD"], ["", "9", "restricted", "HOLD"], ["", "12", "restricted", "HOLD"]]}, "injects": [["Road Control: two of four Road Monitors are still at lunch. Ten minutes.", "Road stays at HOLD with the reason noted."], ["The LCO asks whether igniters can go in before the Road Monitors are in place, since the closure only matters at launch.", "Allowed if the Restricted RSO approves RED. The Restricted site may go RED while its Road is at HOLD. The poll cannot complete until Road is GO."], ["The Launch Director points out that the day is an hour behind.", "The schedule is not a reason to change a status. Each status stays with its owner."], ["The Road Monitors are in place and the sweep is done.", "Road reports GO."]], "probes": ["How long may rockets sit armed while Road catches up?", "Does the same allowance apply when Recovery is at HOLD?"], "site": "restricted"}, {"id": "R3", "area": "Road and spectator", "title": "Medical emergency in the spectator area", "setup": "Salvo 2 at the Restricted site. Igniters are in, the pad is clear and the poll is about to start.", "start": {"sites": {"restricted": {"colour": "RED", "phase": "ARM", "road": "GO", "lco": "GO", "rso": "GO", "cin": 6, "cout": 6}, "advanced": {"colour": "GREEN", "phase": "PREP", "road": "HOLD", "lco": "HOLD", "rso": "HOLD", "cin": 0, "cout": 0}, "statics": {"colour": "GREEN", "phase": "PREP", "road": "HOLD", "lco": "HOLD", "rso": "HOLD", "cin": 0, "cout": 0}}, "items": {"recovery": "GO", "weather": "GO", "airspace": "GO"}, "teams": [["", "4", "restricted", "GO"], ["", "9", "restricted", "GO"], ["", "12", "restricted", "GO"]]}, "injects": [["A Road Monitor: \"BREAK, BREAK, BREAK. A spectator has collapsed at the viewing line.\"", "All other traffic stops. The RCO sets NO-GO at every site and each LCO confirms the controller is safed."], ["The medic asks for an ambulance. The access road runs through the closed section.", "The Chief RSO directs the response. Net Control calls by satellite phone when the Chief RSO or Launch Director says so."], ["Three rockets are on the pads with igniters in.", "The Chief RSO decides, with the Restricted RSO, whether the pads must be made safe before the ambulance uses the road."], ["The ambulance leaves forty minutes later.", "The accident contingency plan is completed. Restart needs the Launch Director's agreement and a full poll."]], "probes": ["Does the ambulance route pass inside the safety distance of a RED pad?", "Who meets the ambulance and guides it in?"], "site": "restricted"}, {"id": "V1", "area": "Recovery", "title": "A recovery team misses a check-in", "setup": "Salvo 3 is arming at the Restricted site. Two recovery teams from salvo 2 are still out.", "start": {"sites": {"restricted": {"colour": "YELLOW", "phase": "ARM", "road": "GO", "lco": "HOLD", "rso": "HOLD", "cin": 6, "cout": 0}, "advanced": {"colour": "GREEN", "phase": "PREP", "road": "HOLD", "lco": "HOLD", "rso": "HOLD", "cin": 0, "cout": 0}, "statics": {"colour": "GREEN", "phase": "PREP", "road": "HOLD", "lco": "HOLD", "rso": "HOLD", "cin": 0, "cout": 0}}, "items": {"recovery": "HOLD", "weather": "GO", "airspace": "GO"}, "teams": [["", "3", "restricted", "HOLD"], ["", "8", "restricted", "HOLD"], ["", "11", "restricted", "HOLD"]]}, "injects": [["Recovery team B misses its check-in.", "Recovery Control calls the team and keeps Recovery at HOLD."], ["Two more calls get no answer. The last position was 1.2 km north-west.", "Recovery Control tells the Chief RSO. The group decides whether this is HOLD or NO-GO."], ["The LCO requests RED for salvo 3.", "The Restricted RSO does not approve RED while a team is unaccounted for."], ["Team B checks in. The radio battery died and they are at the rocket.", "Recovery reports GO once team B has acknowledged the salvo and is at a safe location."]], "probes": ["At what point does a missed check-in become an emergency?", "Who goes to look, and does that put more people in the hazard area?"], "site": "restricted"}, {"id": "V2", "area": "Recovery", "title": "Ballistic return toward a recovery team", "setup": "Salvo 2 at the Restricted site. Recovery team A is deployed 800 m north-west, at what was judged a safe location.", "start": {"sites": {"restricted": {"colour": "RED", "phase": "LAUNCH", "road": "GO", "lco": "GO", "rso": "GO", "cin": 6, "cout": 6}, "advanced": {"colour": "GREEN", "phase": "PREP", "road": "HOLD", "lco": "HOLD", "rso": "HOLD", "cin": 0, "cout": 0}, "statics": {"colour": "GREEN", "phase": "PREP", "road": "HOLD", "lco": "HOLD", "rso": "HOLD", "cin": 0, "cout": 0}}, "items": {"recovery": "GO", "weather": "GO", "airspace": "GO"}, "teams": [["", "4", "restricted", "FLOWN"], ["", "9", "restricted", "FLOWN"], ["", "12", "restricted", "GO"], ["", "15", "restricted", "GO"]]}, "injects": [["Team 12's rocket shows no deployment at apogee and is coming down ballistic to the north-west.", "The LCO calls \"heads up\" on the PA and radio and sounds the siren. Recovery Control repeats it on the recovery loop at once."], ["Recovery team A is to the north-west.", "Recovery Control calls team A directly."], ["An impact is heard. Team A does not answer for one minute.", "HOLD. An alert is raised and the Chief RSO takes direction."], ["Team A reports safe. The impact was about 150 m from them.", "The salvo resumes only when the Chief RSO agrees. The event is logged for the daily debrief."]], "probes": ["Can a team 800 m out hear the PA or the siren?", "What is a safe location for a deployed team during a salvo?"], "site": "restricted"}, {"id": "V3", "area": "Recovery", "title": "A bear on the recovery trail", "setup": "Salvo 2 is closed out and recovery teams are being released.", "start": {"sites": {"restricted": {"colour": "GREEN", "phase": "POST", "road": "HOLD", "lco": "HOLD", "rso": "HOLD", "cin": 6, "cout": 6}, "advanced": {"colour": "GREEN", "phase": "PREP", "road": "HOLD", "lco": "HOLD", "rso": "HOLD", "cin": 0, "cout": 0}, "statics": {"colour": "GREEN", "phase": "PREP", "road": "HOLD", "lco": "HOLD", "rso": "HOLD", "cin": 0, "cout": 0}}, "items": {"recovery": "GO", "weather": "GO", "airspace": "GO"}, "teams": [["", "4", "restricted", "FLOWN"], ["", "9", "restricted", "FLOWN"], ["", "12", "restricted", "FLOWN"]]}, "injects": [["A returning team reports a bear near the trail, 300 m from recovery check-in.", "Recovery goes to HOLD with the reason noted. Teams on that trail are told."], ["Two more teams are about to leave on the same trail.", "Recovery Control holds them."], ["The next salvo plan is ready and the LCO asks for YELLOW.", "The Restricted RSO decides whether to approve YELLOW while Recovery is at HOLD. The RCO is informed, and can set HOLD on that one site."], ["The bear has not been seen for twenty minutes.", "Whoever judged the situation temporary decides when it has cleared. Recovery returns to GO."]], "probes": ["Does Recovery at HOLD block the next salvo's YELLOW?", "Who declares a wildlife hold over?"], "site": "restricted"}, {"id": "C1", "area": "Range control", "title": "A station stops answering", "setup": "Salvo 2 at the Restricted site. The RCO has opened the poll. The teams and Recovery have answered GO.", "start": {"sites": {"restricted": {"colour": "RED", "phase": "ARM", "road": "GO", "lco": "GO", "rso": "GO", "cin": 6, "cout": 6}, "advanced": {"colour": "GREEN", "phase": "PREP", "road": "HOLD", "lco": "HOLD", "rso": "HOLD", "cin": 0, "cout": 0}, "statics": {"colour": "GREEN", "phase": "PREP", "road": "HOLD", "lco": "HOLD", "rso": "HOLD", "cin": 0, "cout": 0}}, "items": {"recovery": "GO", "weather": "GO", "airspace": "GO"}, "teams": [["", "4", "restricted", "GO"], ["", "9", "restricted", "GO"], ["", "12", "restricted", "GO"]]}, "injects": [["Road Control does not answer the poll.", "The RCO does not assume GO. Net Control calls Road Control."], ["Net Control tries twice more. Other stations are loud and clear.", "Road is treated as NO-GO for the Restricted closure, and the site goes to NO-GO."], ["A Road Monitor on the road loop can still be heard.", "Net Control moves Road Control to the backup channel through the Road Monitor."], ["Road Control comes back on the backup channel: \"Road is GO.\"", "Net Control runs a radio check with every station. The RCO runs the poll again from the top."]], "probes": ["Does every station know the backup channel without being told on the dead one?", "May the RCO set another position's item when that position cannot be reached?"], "site": "restricted"}, {"id": "C2", "area": "Range control", "title": "The display goes blank", "setup": "Salvo 2 at the Restricted site. The poll is under way.", "start": {"sites": {"restricted": {"colour": "RED", "phase": "ARM", "road": "GO", "lco": "GO", "rso": "GO", "cin": 6, "cout": 6}, "advanced": {"colour": "GREEN", "phase": "PREP", "road": "HOLD", "lco": "HOLD", "rso": "HOLD", "cin": 0, "cout": 0}, "statics": {"colour": "GREEN", "phase": "PREP", "road": "HOLD", "lco": "HOLD", "rso": "HOLD", "cin": 0, "cout": 0}}, "items": {"recovery": "GO", "weather": "GO", "airspace": "GO"}, "teams": [["", "4", "restricted", "GO"], ["", "9", "restricted", "GO"], ["", "12", "restricted", "GO"]]}, "injects": [["The awareness display at range control goes blank.", "The RCO moves to the paper status board. The poll continues by voice."], ["The RCO remembers that Pad and Road were GO.", "Memory is not used. Each station restates its status and Net Control writes it down."], ["Six minutes later the display returns and shows Recovery at HOLD.", "The display is checked against the voice-confirmed board before anyone relies on it."]], "probes": ["Who keeps the paper board current in normal running, so it is ready?", "When the display and a voice report disagree, which one counts?"], "site": "restricted"}, {"id": "C3", "area": "Range control", "title": "The RCO would launch and the Chief RSO holds", "setup": "Salvo 2 at the Restricted site. The poll is complete and every polled position is GO.", "start": {"sites": {"restricted": {"colour": "RED", "phase": "ARM", "road": "GO", "lco": "GO", "rso": "GO", "cin": 6, "cout": 6}, "advanced": {"colour": "GREEN", "phase": "PREP", "road": "HOLD", "lco": "HOLD", "rso": "HOLD", "cin": 0, "cout": 0}, "statics": {"colour": "GREEN", "phase": "PREP", "road": "HOLD", "lco": "HOLD", "rso": "HOLD", "cin": 0, "cout": 0}}, "items": {"recovery": "GO", "weather": "GO", "airspace": "GO"}, "teams": [["", "4", "restricted", "GO"], ["", "9", "restricted", "GO"], ["", "12", "restricted", "GO"]]}, "injects": [["The wind reads 18 mph, gusting 22. The Chief RSO sets HOLD at every site.", "Every site in an event holds. The Chief RSO was GO until that moment, without being polled, and the call stands."], ["The RCO notes the mean wind is under the limit and three teams are waiting armed.", "The RCO may argue the case but cannot release a safety hold."], ["The Launch Director joins the loop and asks how long this will take.", "The Launch Director can stop the range but cannot turn the Chief RSO's HOLD into GO."], ["Twelve minutes later the gusts continue.", "The Chief RSO decides whether teams disarm: igniters out, then electronics off, with the colour stepping back."]], "probes": ["Is the wind limit a mean or a gust figure?", "How long may armed rockets wait on the pads before they are made safe?"], "site": "restricted"}, {"id": "C4", "area": "Range control", "title": "Lightning with rockets armed", "setup": "Salvo 3 is arming at the Restricted site. A rocket has been raised on the advanced pad.", "start": {"sites": {"restricted": {"colour": "YELLOW", "phase": "ARM", "road": "GO", "lco": "HOLD", "rso": "HOLD", "cin": 6, "cout": 0}, "advanced": {"colour": "GREEN", "phase": "PREP", "road": "HOLD", "lco": "HOLD", "rso": "HOLD", "cin": 4, "cout": 0}, "statics": {"colour": "GREEN", "phase": "PREP", "road": "HOLD", "lco": "HOLD", "rso": "HOLD", "cin": 0, "cout": 0}}, "items": {"recovery": "GO", "weather": "GO", "airspace": "GO"}, "teams": [["", "3", "restricted", "HOLD"], ["", "8", "restricted", "HOLD"], ["", "7", "advanced", "HOLD"]]}, "injects": [["The lightning detector shows a strike at 19 km.", "Weather goes to HOLD. Work is brought to a stopping point."], ["Five minutes later there is a strike at 14 km.", "Weather goes to NO-GO and the hazardous areas are evacuated, whatever state the work is in."], ["One team is halfway through arming its electronics.", "The Restricted RSO decides: finish disarming, or leave now."], ["The storm passes. The last strike was forty minutes ago.", "The Chief RSO lifts the warning. Each site RSO checks the pads, and the people count, before work resumes."]], "probes": ["What colour is a site with armed electronics and nobody there?", "How long after the last strike does work resume? The manual gives no time."], "site": "restricted"}];
+  var ROLES = ["Facilitator", "RCO", "Chief RSO", "Restricted LCO", "Advanced LCO", "Statics LCO", "Restricted RSO", "Advanced RSO", "Statics RSO", "Net Control", "Pad Manager", "Road Control", "Road Monitor", "Recovery Control", "Team lead", "Launch Director", "Response lead"];
+  var SITES = [
+    { key: "restricted", name: "Restricted", pad: "Pad", poll: ["recovery", "road"], needs: ["recovery", "weather", "airspace"], done: "FLOWN", run: "LAUNCH", go: "Launch GO", safing: "igniters out, electronics off, pads safed",
+      mean: { GREEN: "No arming, no igniters. Open to people with business at the pads.", YELLOW: "Onboard electronics being armed. Essential people only.", RED: "Igniters installed. Install crew only, then nobody." } },
+    { key: "advanced", name: "Advanced", pad: "Pad", poll: ["recovery", "road"], needs: ["recovery", "weather", "airspace"], done: "FLOWN", run: "LAUNCH", go: "Launch GO", safing: "tanks off, vehicle depressurized, pad safed",
+      mean: { GREEN: "No arming, nothing filled. Rocket may be raised, igniter fitted on the ground.", YELLOW: "Electronics armed, telemetry check, pad being cleared. Nothing filled.", RED: "Fill stage. Nobody at the pad." } },
+    { key: "statics", name: "Statics", pad: "Test Cell", poll: ["road"], needs: ["weather"], done: "FIRED", run: "TEST", go: "Test GO", safing: "tanks off, test stand safed",
+      mean: { GREEN: "No arming, nothing filled. Work on the stand is allowed.", YELLOW: "Electronics armed, data check, stand being cleared. Nothing filled.", RED: "Fill stage and firing. Nobody at the stand." } }
+  ];
+  var ITEMS = [
+    { key: "recovery", name: "Recovery", short: "Recovery", owner: "Recovery Control" },
+    { key: "weather", name: "Weather", short: "Weather", owner: "Chief RSO" },
+    { key: "airspace", name: "Airspace", short: "Airspace", owner: "Chief RSO" }
+  ];
+  /* Not polled. Each is GO at every site until that position says otherwise, for one site or for several. */
+  var AUTH = [{ key: "rco", name: "RCO" }, { key: "chief", name: "Chief RSO" }];
+  function authDef(k) { return AUTH.filter(function (a) { return a.key === k; })[0]; }
+  var PHASES = ["PREP", "ARM", "LAUNCH", "POST"];
+  function siteDef(k) { return SITES.filter(function (s) { return s.key === k; })[0]; }
+  function itemDef(k) { return ITEMS.filter(function (s) { return s.key === k; })[0]; }
+
+  function fresh() {
+    var st = { v: 3, sites: {}, items: { recovery: { s: "GO", note: "" }, weather: { s: "GO", note: "" }, airspace: { s: "GO", note: "" } },
+      teams: {}, auth: { rco: { note: "", sites: {} }, chief: { note: "", sites: {} } }, alerts: {}, scenario: { id: "", step: 0 } };
+    SITES.forEach(function (s) {
+      st.sites[s.key] = { colour: "GREEN", phase: "PREP", road: { s: "HOLD", note: "" }, lco: { s: "HOLD", note: "" }, rso: { s: "HOLD", note: "" }, cin: 0, cout: 0 };
+      AUTH.forEach(function (a) { st.auth[a.key].sites[s.key] = "GO"; });
+    });
+    return st;
+  }
+  /* One row per firing position. The pad number is fixed when the site LCO assigns it. */
+  function teamList(st, site) {
+    return Object.keys(st.teams).map(function (k) { var t = st.teams[k]; return { id: k, name: t.name || "", num: t.num || "", pad: Number(t.pad) || 0, site: t.site, s: t.s, note: t.note || "", order: t.order || 0, gone: !!t.gone }; })
+      .filter(function (t) { return !t.gone && (!site || t.site === site); }).sort(function (a, b) { return a.pad - b.pad || a.order - b.order; });
+  }
+  function nextPad(st, site) { var used = {}, n = 1; teamList(st, site).forEach(function (t) { used[t.pad] = true; }); while (used[n]) n++; return n; }
+  function teamLabel(t) { var nm = String(t.name || "").trim(), n = String(t.num || "").trim(); return nm && n ? nm + ", Team " + n : nm ? nm : n ? "Team " + n : "Unnamed team"; }
+  function padLabel(t) { return (siteDef(t.site) || SITES[0]).pad + " " + t.pad; }
+  function fullLabel(t) { return padLabel(t) + ", " + teamLabel(t); }
+
+  /* Pure roll-up for one site. OPEN before an event, GO / HOLD / NO-GO while one is under way, SAFING while winding down.
+     Polled: the teams, the range items the site needs, the site's Road closure, the site LCO and the site RSO. Not polled: the RCO and the Chief RSO, who are GO until they say otherwise.
+     A people count that does not match keeps the site from going past HOLD. */
+  function derive(st, key) {
+    var site = st.sites[key], def = siteDef(key);
+    if (site.phase === "PREP") return { s: "OPEN", reasons: ["No event under way. Planning and loading"] };
+    if (site.phase === "POST") return { s: "SAFING", reasons: ["Winding down: " + def.safing, "Returns to OPEN when the site is GREEN and the phase goes back to PREP"] };
+    var nogo = [], hold = [];
+    AUTH.forEach(function (a) {
+      var v = st.auth[a.key], x = v.sites[key], line = a.name + (x === "NO-GO" ? " declares NO-GO" : " calls HOLD") + (v.note ? ": " + v.note : "");
+      if (x === "NO-GO") nogo.push(line); else if (x === "HOLD") hold.push(line);
+    });
+    if (site.cin !== site.cout) hold.push("People count does not match: " + site.cin + " in, " + site.cout + " out");
+    [["road", "Road"], ["lco", "LCO"], ["rso", "RSO"]].forEach(function (p) {
+      var v = site[p[0]], line = def.name + " " + p[1] + " at " + v.s + (v.note ? ": " + v.note : "");
+      if (v.s === "NO-GO") nogo.push(line); else if (v.s === "HOLD") hold.push(line);
+    });
+    def.needs.forEach(function (k) {
+      var v = st.items[k], line = itemDef(k).name + " at " + v.s + (v.note ? ": " + v.note : "");
+      if (v.s === "NO-GO") nogo.push(line); else if (v.s === "HOLD") hold.push(line);
+    });
+    Object.keys(st.alerts).forEach(function (k) { var a = st.alerts[k]; if (a && a.open && a.sev === "CRITICAL") nogo.push("Critical alert: " + a.text); });
+    var waiting = teamList(st, key).filter(function (t) { return t.s !== "FLOWN"; });
+    if (waiting.length && !waiting.some(function (t) { return t.s === "GO"; })) hold.push("No team is GO");
+    if (nogo.length) return { s: "NO-GO", reasons: nogo.concat(hold) };
+    if (hold.length) return { s: "HOLD", reasons: hold };
+    return { s: "GO", reasons: ["Every polled position is GO and the people count matches", "No HOLD or NO-GO from the RCO or the Chief RSO"] };
+  }
+  /* The poll in the order it is called: teams first, then Recovery, Road, Pad and the site RSO. */
+  function pollLine(st, key) {
+    var site = st.sites[key], def = siteDef(key), ts = teamList(st, key).filter(function (t) { return t.s !== "FLOWN"; });
+    var bits = ["Teams " + (ts.length ? ts.filter(function (t) { return t.s === "GO"; }).length + "/" + ts.length + " GO" : "none")];
+    def.poll.forEach(function (k) { bits.push(k === "road" ? "Road " + site.road.s : itemDef(k).short + " " + st.items[k].s); });
+    bits.push("Pad " + site.lco.s); bits.push("RSO " + site.rso.s);
+    return bits.join(" > ");
+  }
+
+  /* A team at HOLD does not hold the site. The site LCO decides to wait or to move on. */
+  function advice(st, key) {
+    var site = st.sites[key]; if (site.phase !== "ARM" && site.phase !== "LAUNCH") return "";
+    var waiting = teamList(st, key).filter(function (t) { return t.s !== "FLOWN" && t.s !== "NO-GO"; });
+    if (!waiting.length || waiting[0].s !== "HOLD") return "";
+    var next = waiting.filter(function (t) { return t.s === "GO"; })[0];
+    var est = waiting[0].note ? " Estimate: " + waiting[0].note + "." : " Ask for the team's estimate.";
+    return fullLabel(waiting[0]) + " is at HOLD." + est + (next ? " LCO decision: wait, or move on to " + fullLabel(next) + "." : " No other team is GO, so the site holds.");
+  }
+
+  /* Things that do not add up between items. Prompts for discussion. The board enforces two rules: the advanced RED rule, and the people count. */
+  function checks(st) {
+    var out = [], running = [];
+    SITES.forEach(function (d) {
+      var s = st.sites[d.key];
+      if (s.colour !== "GREEN" && s.phase === "PREP") out.push(d.name + " is " + s.colour + " while its state is OPEN.");
+      if (s.phase === "LAUNCH") { running.push(d.name); if (s.colour !== "RED") out.push(d.name + " is in " + d.run + " but is not RED."); if (derive(st, d.key).s !== "GO") out.push(d.name + " is in " + d.run + " but its state is not GO."); }
+      if ((s.phase === "ARM" || s.phase === "LAUNCH") && s.lco.s === "GO" && s.cin !== s.cout) out.push(d.name + " LCO reports GO but the people count does not match: " + s.cin + " in, " + s.cout + " out.");
+      if (s.cout > s.cin) out.push(d.name + " counts more people out than in: " + s.cin + " in, " + s.cout + " out.");
+      if (d.key !== "restricted" && s.colour === "RED" && s.cin > s.cout) out.push(d.name + " is RED, the fill stage, with " + (s.cin - s.cout) + " still counted in.");
+      if (s.phase === "PREP" && s.road.s === "GO") out.push(d.name + " Road is GO while the site is OPEN. Closures are per salvo, stood up on YELLOW.");
+      if (s.phase === "POST" && s.colour === "GREEN") out.push(d.name + " is GREEN in SAFING. If the site is safe, move the phase to PREP to reopen it.");
+      AUTH.forEach(function (a) { if (st.auth[a.key].sites[d.key] !== "GO" && !st.auth[a.key].note) out.push(a.name + " has " + d.name + " at " + st.auth[a.key].sites[d.key] + " with no reason given."); });
+    });
+    if (st.sites.advanced.colour === "RED" && st.sites.advanced.road.s !== "GO") out.push("Advanced is RED while its Road is at " + st.sites.advanced.road.s + ". The fill is time sensitive.");
+    if (running.length > 1) out.push(running.join(" and ") + " are in their final phase at the same time. Is that allowed?");
+    return out;
+  }
+
+  if (typeof module !== "undefined" && module.exports) { module.exports = { derive: derive, checks: checks, fresh: fresh, advice: advice, nextPad: nextPad, pollLine: pollLine, fullLabel: fullLabel, teamList: teamList }; return; }
+
+  /* ---------- state, storage, sync ---------- */
+  var state = fresh(), log = {}, role = "Facilitator", showExpected = false, confirming = "", lastState = {}, since = {}, refused = {}, padRefused = {};
+  var db = null, stateDoc = null, logDoc = null, stateExists = false, logExists = false, readOnly = false, chain = Promise.resolve();
+  var LS_STATE = "rsb3.state", LS_LOG = "rsb3.log", LS_ROLE = "rsb3.role";
+  function lsGet(k) { try { return window.localStorage.getItem(k); } catch (e) { return null; } }
+  function lsSet(k, v) { try { window.localStorage.setItem(k, v); } catch (e) { /* storage may be unavailable */ } }
+  var G3 = ["GO", "HOLD", "NO-GO"], C3 = ["GREEN", "YELLOW", "RED"];
+
+  function count(v) { v = Math.floor(Number(v)); return isFinite(v) && v > 0 ? Math.min(v, 999) : 0; }
+  function normalize(raw) {
+    var f = fresh(), s = raw && typeof raw === "object" ? raw : {};
+    SITES.forEach(function (d) {
+      var x = (s.sites || {})[d.key] || {}, l = x.lco || {}, r = x.rso || {}, rd = x.road || {};
+      f.sites[d.key] = { colour: C3.indexOf(x.colour) >= 0 ? x.colour : "GREEN", phase: PHASES.indexOf(x.phase) >= 0 ? x.phase : "PREP",
+        road: { s: G3.indexOf(rd.s) >= 0 ? rd.s : "HOLD", note: String(rd.note || "") },
+        lco: { s: G3.indexOf(l.s) >= 0 ? l.s : "HOLD", note: String(l.note || "") }, rso: { s: G3.indexOf(r.s) >= 0 ? r.s : "HOLD", note: String(r.note || "") },
+        cin: count(x.cin), cout: count(x.cout) };
+    });
+    ITEMS.forEach(function (it) { var x = (s.items || {})[it.key] || {}; f.items[it.key] = { s: G3.indexOf(x.s) >= 0 ? x.s : f.items[it.key].s, note: String(x.note || "") }; });
+    f.teams = s.teams && typeof s.teams === "object" ? JSON.parse(JSON.stringify(s.teams)) : {};
+    AUTH.forEach(function (a) {
+      var x = (s.auth || {})[a.key] || {}, xs = x.sites || {};
+      f.auth[a.key].note = String(x.note || "");
+      SITES.forEach(function (d) { f.auth[a.key].sites[d.key] = G3.indexOf(xs[d.key]) >= 0 ? xs[d.key] : "GO"; });
+    });
+    f.alerts = s.alerts && typeof s.alerts === "object" ? JSON.parse(JSON.stringify(s.alerts)) : {};
+    f.scenario = { id: String((s.scenario || {}).id || ""), step: Number((s.scenario || {}).step || 0) };
+    return f;
+  }
+  function merge(target, patch) {
+    Object.keys(patch).forEach(function (k) {
+      var v = patch[k];
+      if (v && typeof v === "object" && !Array.isArray(v)) { if (!target[k] || typeof target[k] !== "object") target[k] = {}; merge(target[k], v); }
+      else target[k] = v;
+    });
+    return target;
+  }
+  function uid(p) { return p + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+  function queue(fn) { chain = chain.then(fn).catch(function (e) { if (e && e.code === "invalid_argument") { readOnly = true; setSync(); renderAll(true); } }); }
+  function patchState(patch, text, kind) {
+    if (readOnly) return;
+    merge(state, patch); state = normalize(state);
+    if (text) addLog(text, kind || "state");
+    if (db) queue(function () { if (!stateExists) { stateExists = true; return stateDoc.set(JSON.parse(JSON.stringify(state))); } return stateDoc.update(patch); });
+    else lsSet(LS_STATE, JSON.stringify(state));
+    renderAll();
+  }
+  function replaceState(next, text, clearLog) {
+    if (readOnly) return;
+    state = normalize(next); refused = {}; padRefused = {};
+    if (clearLog) log = {};
+    if (db) queue(function () { stateExists = true; return stateDoc.set(JSON.parse(JSON.stringify(state))); });
+    else lsSet(LS_STATE, JSON.stringify(state));
+    if (clearLog) { if (db) queue(function () { logExists = true; return logDoc.set({ entries: {} }); }); else lsSet(LS_LOG, "{}"); }
+    if (text) addLog(text, "inject");
+    renderAll(true);
+  }
+  function addLog(text, kind) {
+    var id = uid("e"), entry = { t: Date.now(), who: role, text: text, k: kind || "note" }, patch = { entries: {} };
+    log[id] = entry; patch.entries[id] = entry;
+    if (db) queue(function () { if (!logExists) { logExists = true; return logDoc.set(patch); } return logDoc.update(patch); });
+    else lsSet(LS_LOG, JSON.stringify(log));
+  }
+  function setSync() {
+    document.getElementById("sync").textContent = readOnly ? "View only. Live from the shared board" : db ? "Shared live with everyone who has this page open" : "This device only";
+  }
+
+  /* ---------- rendering ---------- */
+  function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
+  function dis() { return readOnly ? " disabled" : ""; }
+  function seg(action, key, cur, opts, cls, labels) {
+    return '<span class="seg ' + (cls || "") + '" role="group">' + opts.map(function (o, i) {
+      return '<button type="button" data-act="' + action + '" data-key="' + esc(key) + '" data-val="' + o + '" aria-pressed="' + (cur === o) + '"' + dis() + ">" + (labels ? labels[i] : o) + "</button>";
+    }).join("") + "</span>";
+  }
+  function clock(ms) { var d = new Date(ms); function p(n) { return (n < 10 ? "0" : "") + n; } return p(d.getHours()) + ":" + p(d.getMinutes()) + ":" + p(d.getSeconds()); }
+  function dur(ms) { var s = Math.max(0, Math.floor(ms / 1000)); return Math.floor(s / 60) + ":" + (s % 60 < 10 ? "0" : "") + (s % 60); }
+
+  function countWord(s) { return s.cin === s.cout ? (s.cin === 0 ? "Nobody counted in" : "Count matches") : s.cin > s.cout ? (s.cin - s.cout) + " still in. Site holds" : "More out than in. Site holds"; }
+  function renderSite(d) {
+    var s = state.sites[d.key], dv = derive(state, d.key), adv = advice(state, d.key), pads = d.pad === "Pad" ? "Pads" : "Test cells";
+    if (dv.s !== lastState[d.key]) { lastState[d.key] = dv.s; since[d.key] = Date.now(); }
+    var h = '<section class="panel site" aria-label="' + d.name + ' site">';
+    h += '<div class="band" data-c="' + s.colour + '"><div class="band-head"><span class="site-name">' + d.name + '</span><span class="site-colour">' + s.colour + "</span></div>";
+    h += '<div class="pad-mean">' + d.mean[s.colour] + "</div>";
+    h += '<div class="lamps">' + C3.map(function (c) {
+      return '<button type="button" class="lamp" data-act="colour" data-key="' + d.key + '" data-val="' + c + '" data-c="' + c + '" aria-pressed="' + (s.colour === c) + '"' + dis() + ">" + c + "</button>";
+    }).join("") + "</div>";
+    if (refused[d.key]) h += '<div class="refused">' + esc(refused[d.key]) + "</div>";
+    h += '<div class="count"><label for="cin-' + d.key + '">People in <input type="number" inputmode="numeric" min="0" max="999" id="cin-' + d.key + '" data-act="count" data-key="' + d.key + '" data-val="cin" value="' + s.cin + '"' + dis() + "></label>";
+    h += '<label for="cout-' + d.key + '">People out <input type="number" inputmode="numeric" min="0" max="999" id="cout-' + d.key + '" data-act="count" data-key="' + d.key + '" data-val="cout" value="' + s.cout + '"' + dis() + "></label>";
+    h += '<span class="count-word" data-ok="' + (s.cin === s.cout) + '">' + countWord(s) + "</span></div></div>";
+    h += '<div class="body"><div class="state"><div class="state-word" data-s="' + dv.s + '" aria-live="polite">' + dv.s + "</div>";
+    h += '<ul class="reasons">' + dv.reasons.slice(0, 5).map(function (r) { return "<li>" + esc(r) + "</li>"; }).join("") + (dv.reasons.length > 5 ? "<li>and " + (dv.reasons.length - 5) + " more</li>" : "") + "</ul>";
+    h += '<div class="since" id="since-' + d.key + '"></div></div>';
+    h += '<div class="row"><span class="label">Phase</span>' + seg("phase", d.key, s.phase, PHASES, "", ["PREP", "ARM", d.run, "POST"]) + "</div>";
+    h += '<div class="group"><div class="group-label"><b>Polled</b>, in this order</div><div class="pollline">' + esc(pollLine(state, d.key)) + "</div>";
+    var teams = teamList(state, d.key);
+    h += '<div><div class="label" style="margin-bottom:4px">' + pads + ", assigned by the " + d.name + " LCO</div>";
+    if (teams.length) {
+      h += '<div class="teams">' + teams.map(function (t) {
+        var nm = String(t.name).trim(), n = String(t.num).trim(), lbl = fullLabel(t);
+        return '<div class="team"><span class="padno">' + esc(padLabel(t)) + '</span><span class="item-name">' + esc(nm || (n ? "Team " + n : "Unnamed team")) + (nm && n ? ' <span class="teamnum">Team ' + esc(n) + "</span>" : "") + "</span>" +
+          '<button type="button" class="x" data-act="rmteam" data-key="' + esc(t.id) + '" aria-label="Remove ' + esc(lbl) + '"' + dis() + ">&times;</button>" +
+          seg("team", t.id, t.s, ["GO", "HOLD", "NO-GO", "FLOWN"], "", ["GO", "HOLD", "NO-GO", d.done]) +
+          '<input class="note" type="text" id="note-' + esc(t.id) + '" data-act="teamnote" data-key="' + esc(t.id) + '" value="' + esc(t.note) + '" placeholder="Reason and estimate to GO" aria-label="' + esc(lbl) + ' reason and estimate"' + dis() + "></div>";
+      }).join("") + "</div>";
+    } else h += '<div class="empty">No team at this site yet. Each salvo starts at ' + d.pad + " 1.</div>";
+    h += "</div>";
+    if (adv) h += '<div class="advice">' + esc(adv) + "</div>";
+    h += '<form class="addrow" data-form="addteam" data-key="' + d.key + '"><input type="text" id="newteam-' + d.key + '" placeholder="Team name" maxlength="40" aria-label="Team name for the next ' + d.pad.toLowerCase() + " at " + d.name + '"' + dis() + ">";
+    h += '<input type="text" class="num" inputmode="numeric" id="newnum-' + d.key + '" placeholder="Team no." maxlength="6" aria-label="Team number"' + dis() + ">";
+    h += '<label class="padpick" for="newpad-' + d.key + '">' + d.pad + ' <input type="number" inputmode="numeric" min="1" max="99" id="newpad-' + d.key + '" value="' + nextPad(state, d.key) + '"' + dis() + '></label><button type="submit" class="ghost"' + dis() + ">Assign</button></form>";
+    if (padRefused[d.key]) h += '<div class="refused">' + esc(padRefused[d.key]) + "</div>";
+    h += '<div class="row"><span class="label">Road</span>' + seg("road", d.key, s.road.s, G3) + '<span class="owner">Road Control, this salvo</span></div>';
+    h += '<input class="note" type="text" id="roadnote-' + d.key + '" data-act="roadnote" data-key="' + d.key + '" value="' + esc(s.road.note) + '" placeholder="Road reason, if not GO" aria-label="' + d.name + ' Road reason"' + dis() + ">";
+    h += '<div class="row"><span class="label">Site LCO</span>' + seg("lco", d.key, s.lco.s, G3) + "</div>";
+    h += '<input class="note" type="text" id="lconote-' + d.key + '" data-act="lconote" data-key="' + d.key + '" value="' + esc(s.lco.note) + '" placeholder="LCO reason, if not GO" aria-label="' + d.name + ' LCO reason"' + dis() + ">";
+    h += '<div class="row"><span class="label">Site RSO</span>' + seg("rso", d.key, s.rso.s, G3) + "</div>";
+    h += '<input class="note" type="text" id="rsonote-' + d.key + '" data-act="rsonote" data-key="' + d.key + '" value="' + esc(s.rso.note) + '" placeholder="RSO reason, if not GO" aria-label="' + d.name + ' RSO reason"' + dis() + "></div>";
+    h += '<div class="group"><div class="group-label"><b>Not polled</b>. GO unless they say otherwise</div>';
+    AUTH.forEach(function (a) { h += '<div class="row"><span class="label">' + a.name + "</span>" + seg("auth", a.key + ":" + d.key, state.auth[a.key].sites[d.key], G3) + "</div>"; });
+    h += "</div></div></section>";
+    return h;
+  }
+  function renderSites() { document.getElementById("sec-sites").innerHTML = SITES.map(renderSite).join(""); tick(); }
+  function tick() {
+    SITES.forEach(function (d) {
+      var el = document.getElementById("since-" + d.key); if (!el) return;
+      var dv = derive(state, d.key), t = Date.now() - (since[d.key] || Date.now()), txt = dv.s + " for <b>" + dur(t) + "</b>";
+      if (dv.s === "HOLD" && t > 5 * 60000) txt += ". Past five minutes: run the poll again";
+      el.innerHTML = txt;
+    });
+  }
+  function renderRange() {
+    var h = '<h2>Range-wide readiness <small>GO is ready, HOLD is temporary, NO-GO is severe</small></h2><div class="scroll-x"><table class="ready"><thead><tr><th>Item</th><th>Status</th><th>Reason</th></tr></thead><tbody>';
+    ITEMS.forEach(function (it) {
+      var v = state.items[it.key];
+      h += '<tr><td><div class="item-name">' + it.name + '</div><div class="owner">' + it.owner + "</div></td><td>" + seg("item", it.key, v.s, G3) + "</td>";
+      h += '<td><input class="note" type="text" id="note-' + it.key + '" data-act="itemnote" data-key="' + it.key + '" value="' + esc(v.note) + '" placeholder="Why, if not GO" aria-label="' + it.name + ' reason"' + dis() + "></td></tr>";
+    });
+    h += "</tbody></table></div>";
+    h += '<div class="hint">Road closures are per salvo and per site, so Road is on each site card. Statics needs Road and Weather only. Restricted and Statics may go RED while their Road is at HOLD. Advanced may not. Every colour change: the LCO requests, the site RSO approves, the RCO is informed.</div>';
+    h += '<h2 style="margin-top:4px">RCO and Chief RSO <small>not polled. GO at every site until they say otherwise</small></h2><div class="scroll-x"><table class="ready"><thead><tr><th>Position</th><th>Set every site</th><th>Reason</th></tr></thead><tbody>';
+    AUTH.forEach(function (a) {
+      var v = state.auth[a.key], vals = SITES.map(function (d) { return v.sites[d.key]; }), same = vals.every(function (x) { return x === vals[0]; });
+      h += '<tr><td><div class="item-name">' + a.name + '</div><div class="owner">' + SITES.map(function (d) { return d.name + " " + v.sites[d.key]; }).join(" · ") + "</div></td><td>" + seg("authall", a.key, same ? vals[0] : "", G3) + "</td>";
+      h += '<td><input class="note" type="text" id="authnote-' + a.key + '" data-act="authnote" data-key="' + a.key + '" value="' + esc(v.note) + '" placeholder="Why, if not GO" aria-label="' + a.name + ' reason"' + dis() + "></td></tr>";
+    });
+    h += "</tbody></table></div>";
+    h += '<div class="hint">Either position can set HOLD or NO-GO for one site from that site\u2019s card, or for every site here. Anyone may call HOLD on the radio. It goes on the board through the owner of the item, or through the RCO.</div>';
+    document.getElementById("sec-range").innerHTML = h;
+  }
+  function renderChecks() {
+    var c = checks(state), h = '<h2>Does it add up? <small>items that disagree with each other</small></h2>';
+    h += c.length ? '<ul class="checks">' + c.map(function (x) { return "<li>" + esc(x) + "</li>"; }).join("") + "</ul>" : '<div class="empty">Nothing disagrees right now.</div>';
+    document.getElementById("sec-checks").innerHTML = h;
+  }
+  function scn() { return SCENARIOS.filter(function (s) { return s.id === state.scenario.id; })[0] || null; }
+  function startLine(s) {
+    var st = s.start, bits = [];
+    SITES.forEach(function (d) { var x = st.sites[d.key]; if (x.phase !== "PREP" || x.colour !== "GREEN" || x.cin || x.cout) bits.push(d.name + " " + x.colour + ", phase " + (x.phase === "LAUNCH" ? d.run : x.phase) + ", " + x.cin + " in " + x.cout + " out, Road " + x.road); });
+    ITEMS.forEach(function (it) { if (st.items[it.key] !== "GO") bits.push(it.name + " at " + st.items[it.key]); });
+    return bits.length ? bits.join(" · ") : "All sites OPEN";
+  }
+  function renderScn() {
+    var s = scn(), h = '<h2>Exercise <small>run by the facilitator</small></h2>', areas = [];
+    SCENARIOS.forEach(function (x) { if (areas.indexOf(x.area) < 0) areas.push(x.area); });
+    h += '<label class="field" for="scn-pick">Scenario<select id="scn-pick"' + dis() + '><option value="">Free play, no scenario</option>';
+    areas.forEach(function (a) {
+      h += '<optgroup label="' + esc(a) + '">' + SCENARIOS.filter(function (x) { return x.area === a; }).map(function (x) {
+        return '<option value="' + x.id + '"' + (s && s.id === x.id ? " selected" : "") + ">" + x.id + ". " + esc(x.title) + "</option>";
+      }).join("") + "</optgroup>";
+    });
+    h += "</select></label>";
+    if (s) {
+      var step = state.scenario.step;
+      h += '<div class="scn-setup">' + esc(s.setup) + '</div><div class="scn-start">' + esc(startLine(s)) + "</div>";
+      if (step > 0) {
+        h += '<ol class="injects">';
+        s.injects.slice(0, step).forEach(function (inj, i) {
+          h += '<li class="' + (i === step - 1 ? "now" : "") + '"><div class="inj-n">INJECT </div>' + esc(inj[0]) + (showExpected ? '<div class="expect"><b>Expected:</b> ' + esc(inj[1]) + "</div>" : "") + "</li>";
+        });
+        h += "</ol>";
+      }
+      h += '<div class="row"><button type="button" class="solid" data-act="inject"' + (step >= s.injects.length || readOnly ? " disabled" : "") + ">" + (step === 0 ? "Read first inject" : step >= s.injects.length ? "No more injects" : "Next inject (" + (step + 1) + " of " + s.injects.length + ")") + "</button>";
+      h += '<label class="check" for="expected"><input type="checkbox" id="expected" data-act="expected"' + (showExpected ? " checked" : "") + "> Show expected responses</label></div>";
+      if (step >= s.injects.length) h += '<div><div class="label" style="margin-bottom:4px">Probe questions</div><ul class="probes">' + s.probes.map(function (p) { return "<li>" + esc(p) + "</li>"; }).join("") + "</ul></div>";
+    } else {
+      h += '<div class="empty">Pick a scenario to set the board to its starting state, or change items freely.</div>';
+    }
+    if (confirming === "reset") h += '<div class="confirm">Clear the board and the event log?<button type="button" class="solid" data-act="reset-yes">Clear</button><button type="button" class="ghost" data-act="cancel">Keep</button></div>';
+    else h += '<div class="row"><button type="button" class="ghost" data-act="reset"' + dis() + ">New exercise</button></div>";
+    document.getElementById("sec-scn").innerHTML = h;
+  }
+  function renderAlerts() {
+    var open = Object.keys(state.alerts).map(function (k) { var a = state.alerts[k]; return a && a.open ? { id: k, a: a } : null; }).filter(Boolean).sort(function (x, y) { return y.a.t - x.a.t; });
+    var h = '<h2>Alerts <small>a critical alert puts every site in an event at NO-GO</small></h2>';
+    h += open.length ? '<ul class="alerts">' + open.map(function (x) {
+      return '<li data-sev="' + x.a.sev + '"><span class="sev">' + x.a.sev + "</span><div>" + esc(x.a.text) + '<div class="meta">' + clock(x.a.t) + " · " + esc(x.a.src) + '</div></div><button type="button" class="ghost" data-act="resolve" data-key="' + esc(x.id) + '"' + dis() + ">Resolve</button></li>";
+    }).join("") + "</ul>" : '<div class="empty">No open alerts.</div>';
+    h += '<form class="addrow" data-form="addalert"><select id="alert-sev" aria-label="Severity"' + dis() + '><option>INFO</option><option selected>WARNING</option><option>CRITICAL</option></select><input type="text" id="alert-text" placeholder="What is wrong, and where" maxlength="140" aria-label="Alert text"' + dis() + '><button type="submit" class="ghost"' + dis() + ">Raise alert</button></form>";
+    document.getElementById("sec-alerts").innerHTML = h;
+  }
+  function logRows() { return Object.keys(log).map(function (k) { return log[k]; }).filter(Boolean).sort(function (a, b) { return b.t - a.t; }); }
+  function renderLog() {
+    var rows = logRows(), h = '<h2>Event log <small>' + rows.length + (rows.length === 1 ? " entry" : " entries") + ", newest first</small></h2>";
+    h += '<form class="addrow" data-form="addnote"><input type="text" id="note-text" placeholder="Log a call or a note" maxlength="200" aria-label="Log entry"' + dis() + '><button type="submit" class="ghost"' + dis() + '>Log</button><button type="button" class="ghost" data-act="copy">Copy log</button></form>';
+    h += rows.length ? '<ol class="log" id="loglist">' + rows.slice(0, 300).map(function (e) {
+      return '<li data-k="' + esc(e.k || "note") + '"><span class="t">' + clock(e.t) + '</span><span class="who">' + esc(e.who || "") + '</span><span class="txt">' + esc(e.text) + "</span></li>";
+    }).join("") + "</ol>" : '<div class="empty">Every change to the board is logged here with the time and the position that made it.</div>';
+    document.getElementById("sec-log").innerHTML = h;
+  }
+  var SECTIONS = [["sec-sites", renderSites], ["sec-range", renderRange], ["sec-checks", renderChecks], ["sec-scn", renderScn], ["sec-alerts", renderAlerts], ["sec-log", renderLog]];
+  var dirty = {};
+  function typingIn(el) { var a = document.activeElement; return a && el.contains(a) && a.tagName === "INPUT" && (a.type === "text" || a.type === "number"); }
+  function renderAll(force) {
+    SECTIONS.forEach(function (s) {
+      var el = document.getElementById(s[0]);
+      if (!force && typingIn(el)) dirty[s[0]] = true; else { dirty[s[0]] = false; s[1](); }
+    });
+  }
+  function ownerNote(owner) { return role === owner || role === "Facilitator" ? "" : " (owner is " + owner + ")"; }
+  function sitePatch(key, body) { var o = {}; o[key] = body; return { sites: o }; }
+
+  /* ---------- events ---------- */
+  document.addEventListener("click", function (ev) {
+    var b = ev.target.closest("[data-act]"); if (!b || b.tagName === "INPUT") return;
+    var act = b.getAttribute("data-act"), key = b.getAttribute("data-key"), val = b.getAttribute("data-val"), d, s;
+    if (act === "phase") {
+      d = siteDef(key); s = state.sites[key]; if (s.phase === val) return;
+      var body = { phase: val }, was = derive(state, key).s, lbl = function (p) { return p === "LAUNCH" ? d.run : p; }, extra = "";
+      var full = sitePatch(key, body);
+      if (val === "PREP") {
+        extra = ". Site state OPEN";
+        if (s.cin === s.cout && s.cin) { body.cin = 0; body.cout = 0; extra += ", people count reset"; }
+        if (s.road.s !== "HOLD") { body.road = { s: "HOLD", note: "" }; extra += ", Road closure stood down"; }
+        if (s.phase === "POST") { var old = teamList(state, key); if (old.length) { full.teams = {}; old.forEach(function (t) { full.teams[t.id] = { gone: true }; }); extra += ", " + d.pad.toLowerCase() + " numbers cleared for the next salvo"; } }
+      }
+      if (val === "POST") extra = ". Site state SAFING";
+      if (val === "ARM" && was === "OPEN") extra = ". Event started";
+      patchState(full, d.name + " phase " + lbl(s.phase) + " to " + lbl(val) + extra + ownerNote("RCO"));
+    }
+    else if (act === "colour") {
+      d = siteDef(key); s = state.sites[key]; if (s.colour === val) return;
+      if (key === "advanced" && val === "RED" && s.road.s !== "GO") {
+        refused[key] = "RED refused: Road is at " + s.road.s + ". Advanced cannot go RED until its Road is GO, because the fill is time sensitive.";
+        addLog("Advanced RED refused: Road is at " + s.road.s, "state"); renderAll(); return;
+      }
+      refused[key] = "";
+      patchState(sitePatch(key, { colour: val }), d.name + " " + s.colour + " to " + val + ". LCO requests, " + d.name + " RSO approves, RCO informed" + (val === "YELLOW" && s.colour === "GREEN" ? ". Road Control stands up the closure" : "") + ownerNote(d.name + " LCO"));
+    }
+    else if (act === "lco" && state.sites[key].lco.s !== val) { d = siteDef(key); patchState(sitePatch(key, { lco: { s: val } }), d.name + " LCO " + state.sites[key].lco.s + " to " + val + ownerNote(d.name + " LCO")); }
+    else if (act === "road" && state.sites[key].road.s !== val) { d = siteDef(key); patchState(sitePatch(key, { road: { s: val } }), d.name + " Road " + state.sites[key].road.s + " to " + val + ownerNote("Road Control")); }
+    else if (act === "rso" && state.sites[key].rso.s !== val) { d = siteDef(key); patchState(sitePatch(key, { rso: { s: val } }), d.name + " RSO " + state.sites[key].rso.s + " to " + val + ownerNote(d.name + " RSO")); }
+    else if (act === "auth") {
+      var ak = key.split(":"), au = authDef(ak[0]); d = siteDef(ak[1]); var was1 = state.auth[au.key].sites[d.key]; if (was1 === val) return;
+      var ap = {}; ap[au.key] = { sites: {} }; ap[au.key].sites[d.key] = val;
+      patchState({ auth: ap }, au.name + " " + was1 + " to " + val + " at " + d.name + ownerNote(au.name));
+    }
+    else if (act === "authall") {
+      var au2 = authDef(key), ap2 = {}, changed = SITES.filter(function (x) { return state.auth[au2.key].sites[x.key] !== val; }); if (!changed.length) return;
+      ap2[au2.key] = { sites: {} }; SITES.forEach(function (x) { ap2[au2.key].sites[x.key] = val; });
+      patchState({ auth: ap2 }, au2.name + " sets " + val + " at every site" + ownerNote(au2.name));
+    }
+    else if (act === "item" && state.items[key].s !== val) { var i = {}; i[key] = { s: val }; var it = itemDef(key); patchState({ items: i }, it.name + " " + state.items[key].s + " to " + val + ownerNote(it.owner)); }
+    else if (act === "team" && state.teams[key] && state.teams[key].s !== val) {
+      var tm = state.teams[key], t = {}; t[key] = { s: val }; d = siteDef(tm.site) || SITES[0];
+      var show = function (v) { return v === "FLOWN" ? d.done : v; };
+      patchState({ teams: t }, d.name + " " + fullLabel(tm) + " " + show(tm.s) + " to " + show(val) + ownerNote("Team lead"));
+    }
+    else if (act === "rmteam" && state.teams[key]) { var r = {}; r[key] = { gone: true }; d = siteDef(state.teams[key].site) || SITES[0]; patchState({ teams: r }, d.name + " " + fullLabel(state.teams[key]) + " removed. " + padLabel(state.teams[key]) + " is free" + ownerNote(d.name + " LCO")); }
+    else if (act === "resolve" && state.alerts[key]) { var a = {}; a[key] = { open: false }; patchState({ alerts: a }, "Alert resolved: " + state.alerts[key].text); }
+    else if (act === "inject") {
+      var sc = scn(); if (!sc || state.scenario.step >= sc.injects.length) return;
+      var n = state.scenario.step; patchState({ scenario: { step: n + 1 } }, "Inject " + (n + 1) + ": " + sc.injects[n][0], "inject");
+    }
+    else if (act === "reset") { confirming = "reset"; renderScn(); }
+    else if (act === "cancel") { confirming = ""; renderScn(); }
+    else if (act === "reset-yes") { confirming = ""; replaceState(fresh(), "", true); }
+    else if (act === "copy") {
+      var text = logRows().slice().reverse().map(function (e) { return clock(e.t) + "\t" + (e.who || "") + "\t" + e.text; }).join("\n");
+      var done = function () { b.textContent = "Copied"; setTimeout(function () { b.textContent = "Copy log"; }, 1500); };
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, function () { selectLog(); }); else selectLog();
+    }
+  });
+  function selectLog() { var el = document.getElementById("loglist"); if (!el) return; var r = document.createRange(); r.selectNodeContents(el); var s = window.getSelection(); s.removeAllRanges(); s.addRange(r); }
+  document.addEventListener("change", function (ev) {
+    var el = ev.target, act = el.getAttribute("data-act"), key = el.getAttribute("data-key"), v;
+    if (el.id === "role") { role = el.value; lsSet(LS_ROLE, role); return; }
+    if (el.id === "scn-pick") {
+      var s = SCENARIOS.filter(function (x) { return x.id === el.value; })[0];
+      if (!s) { patchState({ scenario: { id: "", step: 0 } }, "Scenario ended. Free play", "inject"); return; }
+      var next = fresh(), st = s.start;
+      next.scenario = { id: s.id, step: 0 };
+      SITES.forEach(function (d) { var x = st.sites[d.key]; next.sites[d.key] = { colour: x.colour, phase: x.phase, road: { s: x.road, note: "" }, lco: { s: x.lco, note: "" }, rso: { s: x.rso, note: "" }, cin: x.cin, cout: x.cout }; });
+      ITEMS.forEach(function (it) { next.items[it.key] = { s: st.items[it.key], note: "" }; });
+      var padn = {};
+      st.teams.forEach(function (t, i) { padn[t[2]] = (padn[t[2]] || 0) + 1; next.teams["t" + i] = { name: t[0], num: t[1], site: t[2], s: t[3], pad: padn[t[2]], order: i, note: "" }; });
+      replaceState(next, "Scenario " + s.id + ": " + s.title + ". " + s.setup, false);
+      return;
+    }
+    if (act === "count") {
+      var which = el.getAttribute("data-val"), n = count(el.value), cur = state.sites[key]; if (cur[which] === n) { el.value = n; return; }
+      var cb = {}; cb[which] = n; var ci = which === "cin" ? n : cur.cin, co = which === "cout" ? n : cur.cout;
+      patchState(sitePatch(key, cb), siteDef(key).name + " people count " + ci + " in, " + co + " out. " + (ci === co ? "Count matches" : "Count does not match, site cannot go past HOLD") + ownerNote(siteDef(key).name + " LCO"));
+    }
+    else if (act === "expected") { showExpected = el.checked; renderScn(); }
+    else if (act === "itemnote" && state.items[key].note !== el.value.trim()) { v = {}; v[key] = { note: el.value.trim() }; patchState({ items: v }); }
+    else if (act === "lconote" && state.sites[key].lco.note !== el.value.trim()) { patchState(sitePatch(key, { lco: { note: el.value.trim() } })); }
+    else if (act === "roadnote" && state.sites[key].road.note !== el.value.trim()) { patchState(sitePatch(key, { road: { note: el.value.trim() } })); }
+    else if (act === "rsonote" && state.sites[key].rso.note !== el.value.trim()) { patchState(sitePatch(key, { rso: { note: el.value.trim() } })); }
+    else if (act === "authnote" && state.auth[key] && state.auth[key].note !== el.value.trim()) { v = {}; v[key] = { note: el.value.trim() }; patchState({ auth: v }); }
+    else if (act === "teamnote" && state.teams[key] && (state.teams[key].note || "") !== el.value.trim()) { v = {}; v[key] = { note: el.value.trim() }; patchState({ teams: v }); }
+  });
+  document.addEventListener("focusout", function () { setTimeout(function () { SECTIONS.forEach(function (s) { if (dirty[s[0]] && !typingIn(document.getElementById(s[0]))) { dirty[s[0]] = false; s[1](); } }); }, 0); });
+  document.addEventListener("submit", function (ev) {
+    ev.preventDefault(); if (readOnly) return;
+    var f = ev.target.getAttribute("data-form"), inp;
+    if (f === "addteam") {
+      var site = ev.target.getAttribute("data-key"), numEl = document.getElementById("newnum-" + site); inp = document.getElementById("newteam-" + site);
+      var name = inp.value.trim(), num = numEl.value.trim().replace(/^(team|#|no\.?)\s*/i, ""); if (!name && !num) return;
+      var padEl = document.getElementById("newpad-" + site), pad = count(padEl ? padEl.value : 0) || nextPad(state, site), sd = siteDef(site);
+      var taken = teamList(state, site).filter(function (x) { return x.pad === pad; })[0];
+      if (taken) { padRefused[site] = sd.pad + " " + pad + " is already assigned to " + teamLabel(taken) + ". The LCO picks another number."; renderSites(); return; }
+      padRefused[site] = "";
+      var nt = { name: name, num: num, site: site, pad: pad, s: "HOLD", note: "", order: Date.now() }, t = {}; t[uid("t")] = nt;
+      inp.value = ""; numEl.value = ""; inp.blur(); numEl.blur();
+      patchState({ teams: t }, siteDef(site).name + " " + padLabel(nt) + " assigned to " + teamLabel(nt) + ", HOLD" + ownerNote(siteDef(site).name + " LCO"));
+    }
+    else if (f === "addalert") { inp = document.getElementById("alert-text"); var text = inp.value.trim(); if (!text) return; var sev = document.getElementById("alert-sev").value, a = {}; a[uid("a")] = { sev: sev, text: text, src: role, t: Date.now(), open: true }; inp.value = ""; inp.blur(); patchState({ alerts: a }, sev + " alert: " + text, "alert"); }
+    else if (f === "addnote") { inp = document.getElementById("note-text"); var note = inp.value.trim(); if (!note) return; inp.value = ""; inp.blur(); addLog(note, "note"); renderAll(true); }
+  });
+
+  /* ---------- boot ---------- */
+  var roleSel = document.getElementById("role");
+  roleSel.innerHTML = ROLES.map(function (r) { return "<option>" + r + "</option>"; }).join("");
+  var savedRole = lsGet(LS_ROLE); if (savedRole && ROLES.indexOf(savedRole) >= 0) role = savedRole; roleSel.value = role;
+  try { var ls = lsGet(LS_STATE); if (ls) state = normalize(JSON.parse(ls)); var ll = lsGet(LS_LOG); if (ll) log = JSON.parse(ll) || {}; } catch (e) { state = fresh(); log = {}; }
+  renderAll(true); setSync();
+  setInterval(tick, 1000);
+
+})();
+</script>
+
+</body></html>
